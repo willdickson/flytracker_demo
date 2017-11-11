@@ -1,11 +1,9 @@
-skytracker_demo
---------------------
+## skytracker_demo
 
 Simple fly tracking demo for upward facing cameras.
 
 
-Installation
---------------------
+## Installation
 
 You need: numpy, opencv3
 
@@ -17,8 +15,7 @@ $ python setup.py install
 ```
 
 
-Example
----------------------
+## Example
 
 ``` python
 
@@ -47,8 +44,7 @@ tracker.run()
 ```
 
 
-Command Line
----------------------
+## Command Line
 
 ```bash
 
