@@ -8,9 +8,7 @@ Simple fly tracking demo for upward facing cameras.
 You need: numpy, opencv3
 
 ```bash
-
 $ python setup.py install 
-
 
 ```
 
@@ -18,7 +16,6 @@ $ python setup.py install
 ## Example
 
 ``` python
-
 import sys
 from skytracker import SkyTracker
 
@@ -47,7 +44,6 @@ tracker.run()
 ## Command Line
 
 ```bash
-
 $ skytracker --config=myconfig.json myvideofile.mp4
 
 ```
