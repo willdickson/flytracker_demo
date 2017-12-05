@@ -15,13 +15,16 @@ class BlobFinder:
 
     def find(self, image, fg_mask):
 
-        dummy, contour_list, dummy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        dummy, contour_list, dummy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         if self.open_kernel_size[0]*self.open_kernel_size[1] > 0:
             open_kernel = np.ones(self.open_kernel_size, np.uint8) 
-            fg_mask = cv2.morphologyEx(fg_mask,cv2.MORPH_OPEN,open_kernel)
-
-        # Find blob data
+	    #---- KJL 2017_12_04 noticed some flies are split into two; maybe a "closing" operation will be helpful here
+            #fg_mask = cv2.morphologyEx(fg_mask,cv2.MORPH_OPEN,open_kernel)
+	    fg_mask = cv2.dilate(fg_mask, open_kernel, iterations= 2)
+            fg_mask = cv2.erode(fg_mask, open_kernel, iterations= 2)
+            #-----------------------------------------------------------------------------------------------------------
+	# Find blob data
         blob_list = []
         blob_contours = []
 

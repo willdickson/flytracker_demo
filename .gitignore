@@ -3,3 +3,4 @@
 *.pyc
 examples/*.mp4
 examples/*.json
+skytracker/test_output/*
