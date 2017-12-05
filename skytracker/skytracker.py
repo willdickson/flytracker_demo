@@ -129,19 +129,19 @@ class SkyTracker:
 
 # ---------------------------------------------------------------------------------------
 
-if __name__ == '__main__':
-
-    input_video_name = sys.argv[1]
-
-    param = {
-            'bg_window_size': 11,
-            'fg_threshold': 10,
-            'datetime_mask': {'x': 430, 'y': 15, 'w': 500, 'h': 40}, 
-            'min_area': 1, 
-            'max_area': 100000,
-            'open_kernel_size': (3,3),
-            }
-
-    tracker = SkyTracker(input_video_name=input_video_name, param=param)
-    tracker.run()
+#if __name__ == '__main__':
+#
+#    input_video_name = sys.argv[1]
+#
+#    param = {
+#            'bg_window_size': 11,
+#            'fg_threshold': 10,
+#            'datetime_mask': {'x': 430, 'y': 15, 'w': 500, 'h': 40}, 
+#            'min_area': 1, 
+#            'max_area': 100000,
+#            'open_kernel_size': (3,3),
+#            }
+#
+#    tracker = SkyTracker(input_video_name=input_video_name, param=param)
+#    tracker.run()
 
