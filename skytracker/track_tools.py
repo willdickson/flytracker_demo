@@ -1,7 +1,9 @@
 from __future__ import print_function
+import cv2
 import sys
 import copy
 import math
+import numpy
 import skytracker
 import matplotlib.pyplot as plt
 
@@ -13,108 +15,230 @@ class BlobMatcher:
 
     default_param = {'max_blobs': 10, 'max_dist': 300}
 
-
     def __init__(self, param=default_param):
         self.param = param
 
+    def run(self, blob_data):
+        return self.get_match_list(blob_data)
 
-    def run(self,blob_data):
+    def get_match_list(self,blob_data):
+
         match_list = []
+
         for curr_item, next_item in zip(blob_data[0:-1],blob_data[1:]):
-            # Get current and next frame and blob data
+
             curr_frame = curr_item['frame']
             next_frame = next_item['frame']
             next_blob_list = next_item['blobs']
             curr_blob_list = curr_item['blobs']
 
-            # Initialize frame pair and blob pair data
-            frame_pair = curr_frame, next_frame
+            num_to_check = len(curr_blob_list)
             blob_pair_list = []
-            match_data = {}
 
-            if len(curr_blob_list) <= self.param['max_blobs']:
-                next_blob_list_tmp = copy.copy(next_blob_list)
+            # If there aren't too many blobs - check all candidate pairs and select the best matches
+            if num_to_check <= self.param['max_blobs']:
+
+                # Create and sort list of candidate blob pairs
+                candidate_pair_list = []
                 for curr_blob in curr_blob_list:
-                    dist_list = [(blob_distance(curr_blob,next_blob),i) for i, next_blob in enumerate(next_blob_list_tmp)]
-                    if len(dist_list) == 0:
-                        continue
-                    min_dist, min_index = min(dist_list) 
-                    if min_dist <= self.param['max_dist']:
-                        next_blob = next_blob_list_tmp[min_index]
-                        blob_pair = curr_blob, next_blob
-                        blob_pair_list.append(blob_pair)
-                        next_blob_list_tmp.pop(min_index)
+                    for next_blob in next_blob_list:
+                        distance = blob_distance(curr_blob, next_blob)
+                        candidate_pair_list.append((distance, (curr_blob, next_blob)))
+                candidate_pair_list.sort()
 
-            match_data = {'frame_pair': frame_pair, 'blob_pair_list': blob_pair_list}
+                # Check blob pairs until we have check all in curr_blob_list
+                while num_to_check > 0:
+                    if len(candidate_pair_list) == 0:
+                        break
+                    distance, blob_pair = candidate_pair_list.pop(0)
+                    if distance <= self.param['max_dist']:
+                        blob_pair_list.append(blob_pair)
+                        # Remove 2nd blob - which was matched to 1st - from list of candidates
+                        candidate_pair_list = [item for item in candidate_pair_list if item[1][1] != blob_pair[1]] 
+                    # Remove 1st blob from list of candidates
+                    candidate_pair_list = [item for item in candidate_pair_list if item[1][0] != blob_pair[0]]
+                    num_to_check -= 1
+
+            match_data = {'frame_pair': (curr_frame, next_frame), 'blob_pair_list': blob_pair_list}
             match_list.append(match_data)
+
         return match_list
 
-
+                
 class BlobStitcher:
     """
     Stitches together pairwise blob matches into trajectories.
     """
 
-    default_param = {}
-
-    def __init__(self,param=default_param):
-        self.param = param
+    def __init__(self):
         self.match_list_working = []
 
-
     def run(self, match_list):
-        raw_track_list = self.get_raw_track_list(match_list)
-        cleaned_track_list = self.clean_raw_track_list(raw_track_list)
+        track_list = self.get_track_list(match_list)
+        return track_list
 
-        #for cleaned_track in cleaned_track_list:
-        #    for item in cleaned_track:
-        #        print(item)
-        #    print()
-
-        return cleaned_track_list
-        
-    def clean_raw_track_list(self, raw_track_list):
-        cleaned_track_list = []
-        for raw_track in raw_track_list:
-            cleaned_track = []
-            for frame_pair, blob_pair in (raw_track + [raw_track[-1]]):
-                cleaned_track.append({'frame': frame_pair[0], 'blob': blob_pair[0]})
-            cleaned_track_list.append(cleaned_track)
-        return cleaned_track_list
-
-
-
-
-    def get_raw_track_list(self,match_list):
+    def get_track_list(self,match_list):
         """
-        Returns list of all raw tracks. Each raw track consists of a list of (frame_pair, blob_pair) 
-        tuples.
+        Returns list of all tracks. 
         """
-        raw_track_list = []
+        track_list = []
         self.match_list_working = copy.deepcopy(match_list)
         for index in range(len(self.match_list_working)-1): 
             frame_pair = self.match_list_working[index]['frame_pair']
             for blob_pair in self.match_list_working[index]['blob_pair_list']:
-                raw_track = self.get_raw_track(frame_pair, blob_pair,index+1) 
-                raw_track_list.append(raw_track)
+                track = self.get_track(frame_pair, blob_pair,index+1) 
+                track_list.append(track)
         self.match_list_working = []
-        return raw_track_list
+        return track_list
 
-
-    def get_raw_track(self, frame_pair, blob_pair, index):
+    def get_track(self, frame_pair, blob_pair, index):
         """
-        Returns raw track for the given frame_pair and blob_pair found by searching forward 
-        through working match_list (self.match_list_working) starting at the given index.  Blob pairs 
-        are removed from the working match_list as they are added to tracks.
+        Returns track for given frame_pair, blob_pair found by search forward through the 
+        working list of all blob pair matches until no more matches are found. Blob pairs are 
+        removed from the working list of pair matches as they are added to tracks.
         """
-        raw_track = [(frame_pair,blob_pair)]
+        track = [{'frame': frame_pair[0], 'blob': blob_pair[0]}]
         next_frame_pair = self.match_list_working[index]['frame_pair']
         for next_blob_pair in self.match_list_working[index]['blob_pair_list']:
             if next_blob_pair[0] == blob_pair[1]:
-                raw_track.extend(self.get_raw_track(next_frame_pair, next_blob_pair, index+1))
+                track.extend(self.get_track(next_frame_pair, next_blob_pair, index+1))
                 self.match_list_working[index]['blob_pair_list'].remove(next_blob_pair)
                 break;
-        return raw_track
+        if len(track) == 1:
+            track.append({'frame': frame_pair[1], 'blob': blob_pair[1]})
+        return track
+
+
+class TrackVideoCreator:
+
+    def __init__(self, video_file, track_list):
+
+        self.video_file = video_file
+        self.track_list = track_list
+        self.param = {
+                'circle_radius_margin': 5, 
+                'circle_radius_min': 8,
+                'point_radius': 2
+                } 
+
+    def run(self):
+
+        cap = cv2.VideoCapture(self.video_file)
+        number_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        start_frame = self.track_list[0][0]['frame']
+
+        frame_to_tracks_dict = self.get_frame_to_tracks_dict(start_frame, number_of_frames-1)
+
+        frame_number = start_frame
+
+        while True:
+
+            print('frame: {0}'.format(frame_number))
+
+            cap.set(cv2.CAP_PROP_POS_FRAMES,frame_number)
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            tracks_in_frame = frame_to_tracks_dict[frame_number]
+
+            if tracks_in_frame:
+                for track in tracks_in_frame:
+
+                    # Draw line segments track points which arent from the current frame number
+                    for (item0, item1) in zip(track[:-1], track[1:]):
+                        frame0 = item0['frame']
+                        frame1 = item1['frame']
+                        if frame0 == frame_number or frame1 == frame_number:
+                            continue
+                        x0 = int(item0['blob']['centroid_x'])
+                        y0 = int(item0['blob']['centroid_y'])
+                        x1 = int(item1['blob']['centroid_x'])
+                        y1 = int(item1['blob']['centroid_y'])
+                        cv2.line(frame, (x0, y0), (x1, y1), (0,0,255))
+                        cv2.circle(frame, (x0, y0), self.param['point_radius'], (0,0,255), cv2.FILLED)
+                        cv2.circle(frame, (x1, y1), self.param['point_radius'], (0,0,255), cv2.FILLED)
+
+                    # Draw circle and line segments for point from current frame
+                    for i, item in enumerate(track):
+                        print(i)
+                        print(item)
+                        if item['frame'] == frame_number:
+                            x = item['blob']['centroid_x']
+                            y = item['blob']['centroid_y']
+                            area = item['blob']['area']
+                            radius = int(numpy.sqrt(area/numpy.pi) + self.param['circle_radius_margin'])
+                            radius = max(radius, int(self.param['circle_radius_min']))
+                            cv2.circle(frame,(int(x),int(y)), radius, (255,0,0))
+                            if i != 0:
+                                prev_item = track[i-1]
+                                self.draw_partial_line_seg(frame, item['blob'], prev_item['blob'], radius)
+                            if i !=  len(track)-1:
+                                next_item = track[i+1]
+                                self.draw_partial_line_seg(frame, item['blob'], next_item['blob'], radius)
+
+            cv2.imshow('frame',frame)
+
+            if 1:
+                wait_key_val = cv2.waitKey(0) & 0xFF
+                if wait_key_val == ord('q'):
+                    break
+                if wait_key_val == ord('f'):
+                    frame_number += 1
+                if wait_key_val == ord('b'):
+                    frame_number -= 1
+            else:
+                wait_key_val = cv2.waitKey(1) & 0xFF
+                if wait_key_val == ord('q'):
+                    break
+                frame_number += 1
+
+        # Clean up
+        cap.release()
+        cv2.destroyAllWindows()
+
+    def get_frame_to_tracks_dict(self, start_frame, end_frame):
+
+        frame_to_tracks_dict = {}
+
+        # Empty list until start_frame
+        for i in range(start_frame):
+            frame_to_tracks_dict[i] = []
+
+        # Loop over frames and add all tracks which contains frame to list for 
+        # that frame.
+        for i in range(start_frame, end_frame+1):
+            frame_to_tracks_dict[i] = []
+            for track in self.track_list:
+                if any([i==item['frame'] for item in track]):
+                    frame_to_tracks_dict[i].append(track)
+
+        return frame_to_tracks_dict
+
+    def draw_partial_line_seg(self,frame, blob0, blob1, radius):
+        x0 = blob0['centroid_x']
+        y0 = blob0['centroid_y']
+        x1 = blob1['centroid_x']
+        y1 = blob1['centroid_y']
+
+        dx = x1 - x0
+        dy = y1 - y0
+        vec_len = numpy.sqrt(dx**2 + dy**2)
+        ux = dx/vec_len
+        uy = dy/vec_len
+
+        x_circ = int(x0 + radius*ux)
+        y_circ = int(y0 + radius*uy)
+
+        x1 = int(x1)
+        y1 = int(y1)
+
+        cv2.line(frame,(x_circ, y_circ), (x1, y1), (0,0,255))
+        cv2.circle(frame, (x1, y1), self.param['point_radius'], (0,0,255))
+
+        
+
+
 
 # Utility functions
 # ------------------------------------------------------------------------------
@@ -126,44 +250,6 @@ def blob_distance(blob_0, blob_1):
     x0, y0 = blob_position(blob_0)
     x1, y1 = blob_position(blob_1)
     return math.sqrt((x0-x1)**2 + (y0-y1)**2)
-
-
-# Testing
-# -----------------------------------------------------------------------------
-if __name__ == '__main__':              
-
-    blob_data_file = sys.argv[1]
-    
-    blob_data = skytracker.load_blob_data(blob_data_file)
-    
-    matcher = BlobMatcher()
-    match_data = matcher.run(blob_data)
-    
-    stitcher = BlobStitcher(match_data)
-    track_list = stitcher.run(match_data)
-    
-    for track in track_list:
-        x_vals = []
-        y_vals = []
-
-        #for item in track:
-        #    print(item)
-        #print()
-    
-        for item in track:
-            frame = item['frame']
-            blob = item['blob']
-            x_vals.append(blob['centroid_x'])
-            y_vals.append(blob['centroid_y'])
-        print(x_vals)
-        print(y_vals)
-        print()
-        plt.plot(x_vals, y_vals,'.-')
-        #plt.plot(x_vals, y_vals,'-')
-    
-    plt.show()
-    
-    
 
 
 

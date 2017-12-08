@@ -62,15 +62,18 @@ class SkyTracker:
         if self.param['blob_file_name'] is not None:
             blob_fid = open(self.param['blob_file_name'], 'w')
 
-        frame_count = 0
+        frame_count = -1
 
         while True:
+
             print('frame count: {0}'.format(frame_count))
 
             # Get frame, mask and convert to gray scale
             ret, frame = cap.read()
             if not ret:
                 break
+            frame_count += 1
+
             frame = self.apply_datetime_mask(frame)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -82,7 +85,6 @@ class SkyTracker:
                         (frame.shape[1], frame.shape[0]),
                         )
 
-            frame_count += 1
 
             # Update background model 
             bg_model.update(frame)
@@ -109,7 +111,6 @@ class SkyTracker:
                 cv2.imshow('circ_image', circ_image)
             else:
                 cv2.imshow('circ_image', circ_image)
-
                 
             wait_key_val = cv2.waitKey(1) & 0xFF
             if wait_key_val == ord('q'):
