@@ -8,8 +8,8 @@ class BlobFinder:
         self.filter_by_area = filter_by_area 
         self.min_area = min_area 
         self.max_area = max_area 
-        self.open_kernel_size = open_kernel_size 
-        self.close_kernel_size = close_kernel_size
+        self.open_kernel_size = tuple(open_kernel_size)
+        self.close_kernel_size = tuple(close_kernel_size)
         self.circ_min_radius = 10
         self.circ_radius_margin = 15
         self.kernel_shape = kernel_shape
