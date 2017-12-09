@@ -38,7 +38,8 @@ class FrameStepper:
                 frame_pos += 1
             if wait_key_val == ord('b'):
                 frame_pos -= 1
-
+	    if wait_key_val == ord('j'):
+		frame_pos = int(raw_input("Jump to frame: ")) 
             frame_pos = max(frame_pos,0)
             frame_pos = min(frame_pos,num_frames-1)
 
@@ -54,6 +55,5 @@ class FrameStepper:
 if __name__ == '__main__':
 
     file_name = sys.argv[1]
-
     stepper = FrameStepper(file_name)
     stepper.run()

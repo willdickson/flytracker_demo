@@ -18,6 +18,8 @@ class SkyTracker:
             'min_area': 0, 
             'max_area': 100000,
             'open_kernel_size': (3,3),
+            'close_kernel_size': (3,3),
+            'kernel_shape': 'ellipse',
             'output_video_name': 'tracking_video.mp4',
             'output_video_fps': 20.0,
             'blob_file_name': 'blob_data.json',
@@ -52,7 +54,9 @@ class SkyTracker:
                 filter_by_area=True, 
                 min_area=self.param['min_area'], 
                 max_area=self.param['max_area'],
-                open_kernel_size = self.param['open_kernel_size']
+                open_kernel_size = self.param['open_kernel_size'],
+                close_kernel_size = self.param['close_kernel_size'],
+                kernel_shape = self.param['kernel_shape']
                 )
 
         # Output files
