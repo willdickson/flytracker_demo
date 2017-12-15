@@ -24,6 +24,7 @@ class SkyTracker:
             'output_video_fps': 20.0,
             'blob_file_name': 'blob_data.json',
             'show_dev_images' : False,
+            'min_interblob_spacing' : 2
             }
 
     def __init__(self, input_video_name, param=default_param):
@@ -56,8 +57,9 @@ class SkyTracker:
                 max_area=self.param['max_area'],
                 open_kernel_size = self.param['open_kernel_size'],
                 close_kernel_size = self.param['close_kernel_size'],
-                kernel_shape = self.param['kernel_shape']
-                )
+                kernel_shape = self.param['kernel_shape'],
+		#---------KJL 2017_12_15
+                min_interblob_spacing = self.param['min_interblob_spacing'])
 
         # Output files
         vid = None  

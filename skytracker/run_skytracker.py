@@ -27,6 +27,7 @@ param = {
         'output_video_fps': 25.0,
         'blob_file_name': blob_file_name,
         'show_dev_images' : False,
+        'min_interblob_spacing' : 2
         }
 
 tracker = SkyTracker(input_video_name=videofile, param=param)
