@@ -4,7 +4,7 @@ import numpy as np
 
 class BlobFinder:
 
-    def __init__(self, filter_by_area=True, min_area=100, max_area=None, open_kernel_size=3, close_kernel_size=3,kernel_shape='ellipse'):
+    def __init__(self, filter_by_area=True, min_area=100, max_area=None, open_kernel_size=3, close_kernel_size=3,kernel_shape='ellipse',min_interblob_spacing = 2):
         self.filter_by_area = filter_by_area 
         self.min_area = min_area 
         self.max_area = max_area 
@@ -13,14 +13,16 @@ class BlobFinder:
         self.circ_min_radius = 10
         self.circ_radius_margin = 15
         self.kernel_shape = kernel_shape
-
+	#-------------KJL 2017_12_14 -----------------------
+        self.min_interblob_spacing = min_interblob_spacing #expressed as a fraction of the blob's longest dimension; helps prevent a fly from being seen as two separate blobs
+	#-------------KJL 2017_12_14 -----------------------
     def find(self, image, fg_mask):
 
         dummy, contour_list, dummy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         fg_mask_copy = np.array(fg_mask)
 
-        if self.open_kernel_size[0]*self.open_kernel_size[1] > 0: # <------- open_kernel_size isn't a list, I thought? 
+        if self.open_kernel_size[0]*self.open_kernel_size[1] > 0: 
 
             
             if self.kernel_shape == 'rect':
@@ -74,14 +76,39 @@ class BlobFinder:
                 min_y = bound_rect[1]
                 max_x = bound_rect[0] + bound_rect[2] 
                 max_y = bound_rect[1] + bound_rect[3] 
+
+            #----------------KJL 2017_12_14 ---------------------start -------
+	    #------------ this works for fusing two blobs, but I'm not sure I expect it to yield good results for three or more
+                dx = bound_rect[2]
+                dy = bound_rect[3]
+                max_dim = max(dx,dy)
+                fuse_blobs_across = max_dim*self.min_interblob_spacing
+                for other_index, other_blob in enumerate(blob_list):
+                    other_position = (int(other_blob['centroid_x']), int(other_blob['centroid_y']))
+                    if np.sqrt((centroid_x-other_position[0])**2 + (centroid_y-other_position[1])**2) < fuse_blobs_across:
+                        print ('fusing two blobs')
+                        blob_ok = False
+                        new_centroid_x = (centroid_x+ other_position[0])/2  	 #could be cheesy-- I'm just averaging the centroids
+                        new_centroid_y = (centroid_y+ other_position[1])/2
+                        new_area = area + other_blob['area']
+                        new_min_x = min(min_x, other_blob['min_x'])
+                        new_min_y = min(min_y, other_blob['min_y'])
+                        new_max_x = max(max_x, other_blob['max_x'])
+                        new_max_y = max(max_y, other_blob['max_y'])
+                        fused_blob = {'centroid_x' : new_centroid_x,
+					'centroid_y' : new_centroid_y,
+					'min_x'      : new_min_x,
+					'max_x'      : new_max_x,
+					'min_y'      : new_min_y,
+                                    	'max_y'      : new_max_y,
+                                    	'area'       : new_area,}
+                        blob_list[other_index] = fused_blob 
+            #----------------KJL 2017_12_14 --------------------- end---------
             else:
                 min_x = 0.0 
                 min_y = 0.0
                 max_x = 0.0
                 max_y = 0.0
-        
-            #----------------KJL---------------------
-            # check if blob is very close to another blob with respect to blob length; 
             # Create blob dictionary
             blob = {
                     'centroid_x' : centroid_x,
@@ -97,6 +124,13 @@ class BlobFinder:
             if blob_ok: 
                 blob_list.append(blob)
                 blob_contours.append(contour)
+	#----------------KJL 2017_12_14 ---------------------start ---------
+	# check if blob is very close to another blob in the same frame with respect to longest dimension
+	# as far as I can tell, blob_finder.find is called by skytracker on a frame-by-frame basis, so this blob_list contains only blobs from the same frame
+
+# at the moment I'm not happy with how I've dealt with the blob_contours list (just removed one of the contours, didn't make any substantive modifications)
+	#----------------KJL 2017_12_14 --------------------- end---------
+
 
         # Draw blob on image
         blob_image = cv2.cvtColor(fg_mask_copy,cv2.COLOR_GRAY2BGR)
