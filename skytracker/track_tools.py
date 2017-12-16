@@ -236,12 +236,76 @@ class TrackVideoCreator:
         cv2.line(frame,(x_circ, y_circ), (x1, y1), (0,0,255))
         cv2.circle(frame, (x1, y1), self.param['point_radius'], (0,0,255))
 
-        
 
+def filter_outlying_segments(track_list, multiplier=1, use_mad=False, filter_floor_pix=50):
+    
+    new_track_list = []
+    change_flag_list = []
+
+    debug_track_list = []
+
+    for i, track in enumerate(track_list):
+
+        x_vals =[]
+        y_vals =[]
+        flagged_indices = []
+
+        if len(track) <= 2:
+            change_flag_list.append(False)
+            new_track_list.append(track)
+            continue
+
+        x_vals = [item['blob']['centroid_x'] for item in track]
+        y_vals = [item['blob']['centroid_y'] for item in track]
+
+        diff_x = numpy.array(numpy.diff(x_vals))
+        diff_y = numpy.array(numpy.diff(y_vals))
+
+        step_array = (numpy.sqrt(diff_x**2 + diff_y**2))
+        
+        if use_mad:
+            intrapair_mad = get_mad(step_array)
+            intrapair_median = numpy.median(step_array)
+        else:
+            intrapair_step_sigma = numpy.std(step_array)
+            intrapair_step_mean = numpy.mean(step_array)
+
+        for index, value in enumerate(step_array):
+            if use_mad:
+                if numpy.abs(value - intrapair_median) > max(intrapair_mad*multiplier, filter_floor_pix):
+                    flagged_indices.append(index+1)
+            else:
+                if numpy.abs(value - intrapair_step_mean) > max(intrapair_step_sigma*multiplier,filter_floor_pix):
+                    flagged_indices.append(index+1)
+                    print('i: {0}, avg: {1:1.2f}, std: {2:1.2f}, max: {3:1.2f}, {4}'.format(i,intrapair_step_mean, intrapair_step_sigma, step_array.max(), len(track)))
+
+        if len(flagged_indices) == 0:
+            change_flag_list.append(False)
+            new_track_list.append(track)
+            continue
+
+        debug_track_list.append(track)
+    
+        flagged_indices.insert(0,0)
+        flagged_indices.append(len(track))
+
+
+        for n, m in zip(flagged_indices[:-1], flagged_indices[1:]):
+            new_track = track[n:m]
+            if len(new_track) > 1:
+                new_track_list.append(new_track)
+                change_flag_list.append(True)
+
+    return new_track_list, change_flag_list, debug_track_list
+        
 
 
 # Utility functions
 # ------------------------------------------------------------------------------
+
+def get_mad(data):
+    median = numpy.median(data)
+    return numpy.median(numpy.abs(data - median))
 
 def blob_position(blob):
     return blob['centroid_x'], blob['centroid_y']

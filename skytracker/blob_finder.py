@@ -13,9 +13,9 @@ class BlobFinder:
         self.circ_min_radius = 10
         self.circ_radius_margin = 15
         self.kernel_shape = kernel_shape
-	#-------------KJL 2017_12_14 -----------------------
+        # -------------KJL 2017_12_14 -----------------------
         self.min_interblob_spacing = min_interblob_spacing #expressed as a fraction of the blob's longest dimension; helps prevent a fly from being seen as two separate blobs
-	#-------------KJL 2017_12_14 -----------------------
+        # -------------KJL 2017_12_14 -----------------------
     def find(self, image, fg_mask):
 
         dummy, contour_list, dummy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -77,33 +77,38 @@ class BlobFinder:
                 max_x = bound_rect[0] + bound_rect[2] 
                 max_y = bound_rect[1] + bound_rect[3] 
 
-            #----------------KJL 2017_12_14 ---------------------start -------
-	    #------------ this works for fusing two blobs, but I'm not sure I expect it to yield good results for three or more
+                #----------------KJL 2017_12_14 ---------------------------
+
                 dx = bound_rect[2]
                 dy = bound_rect[3]
                 max_dim = max(dx,dy)
                 fuse_blobs_across = max_dim*self.min_interblob_spacing
                 for other_index, other_blob in enumerate(blob_list):
-                    other_position = (int(other_blob['centroid_x']), int(other_blob['centroid_y']))
-                    if np.sqrt((centroid_x-other_position[0])**2 + (centroid_y-other_position[1])**2) < fuse_blobs_across:
+                    
+                    other_x, other_y = other_blob['centroid_x'], other_blob['centroid_y'] 
+
+                    if np.sqrt((centroid_x-other_x)**2 + (centroid_y-other_y)**2) < fuse_blobs_across:
+
                         print ('fusing two blobs')
                         blob_ok = False
-                        new_centroid_x = (centroid_x+ other_position[0])/2  	 #could be cheesy-- I'm just averaging the centroids
-                        new_centroid_y = (centroid_y+ other_position[1])/2
+                        new_centroid_x = (centroid_x + other_x)/2 #could be cheesy-- I'm just averaging the centroids
+                        new_centroid_y = (centroid_y + other_y)/2
                         new_area = area + other_blob['area']
                         new_min_x = min(min_x, other_blob['min_x'])
                         new_min_y = min(min_y, other_blob['min_y'])
                         new_max_x = max(max_x, other_blob['max_x'])
                         new_max_y = max(max_y, other_blob['max_y'])
-                        fused_blob = {'centroid_x' : new_centroid_x,
-					'centroid_y' : new_centroid_y,
-					'min_x'      : new_min_x,
-					'max_x'      : new_max_x,
-					'min_y'      : new_min_y,
-                                    	'max_y'      : new_max_y,
-                                    	'area'       : new_area,}
+                        fused_blob = {
+                                'centroid_x' : new_centroid_x, 
+                                'centroid_y' : new_centroid_y, 
+                                'min_x'      : new_min_x, 
+                                'max_x'      : new_max_x, 
+                                'min_y'      : new_min_y, 
+                                'max_y'      : new_max_y, 
+                                'area'       : new_area,}
                         blob_list[other_index] = fused_blob 
-            #----------------KJL 2017_12_14 --------------------- end---------
+
+            #----------------KJL 2017_12_14 -----------------------------
             else:
                 min_x = 0.0 
                 min_y = 0.0
@@ -120,16 +125,10 @@ class BlobFinder:
                     'area'       : area,
                     } 
             
-            # Ifblob is OK add to list of blobs
+            # If blob is OK add to list of blobs
             if blob_ok: 
                 blob_list.append(blob)
                 blob_contours.append(contour)
-	#----------------KJL 2017_12_14 ---------------------start ---------
-	# check if blob is very close to another blob in the same frame with respect to longest dimension
-	# as far as I can tell, blob_finder.find is called by skytracker on a frame-by-frame basis, so this blob_list contains only blobs from the same frame
-
-# at the moment I'm not happy with how I've dealt with the blob_contours list (just removed one of the contours, didn't make any substantive modifications)
-	#----------------KJL 2017_12_14 --------------------- end---------
 
 
         # Draw blob on image
